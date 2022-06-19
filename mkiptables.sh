@@ -1,44 +1,39 @@
 #!/bin/bash
 unset IFS
-#       verify first run at boot this script is ignored
-[ ! -f /tmp/iptbltm ] && /usr/bin/touch /tmp/iptbltm && exit 0
-
-#       Verify VLAN functionality
-#if grep -q 8021q /etc/modules; then
-#       echo "8021q" > /etc/modules
-#fi
-#modprobe 8021q
-
 ######        USER MODIFICATION AREA        ######
 #       Expected array format
-#X=('Y' '' '' 'Z')
+#X=('' 'X' '' 'Y' '' '' 'Z' '')
 
-#       Configuration warning messages
+#       Output configuration warning messages
 WARNING=true
 
 #       State WAN/gateway interface names in array format
-WANINTS=('eth0')
-#       State open ports on default (first) WAN interface (E.G. 80/443 for HTTP/HTTPS servers) or a single 'all' for completely open (NOT RECOMMENDED!)
-WANPRTS=('')
+WANINTS=('' '')
+#       State default (first) WAN interface open ports (E.G. 80/443 for HTTP/HTTPS servers) in array format or a single 'all' for completely open (NOT RECOMMENDED!)
+WANPRTS=('' '' '' '')
 #       Open default WAN ports on all WAN interfaces
 WANSPRT=false
-#       Open default WAN ports on all LAN interfaces
-LANSPRT=true
 
 #       State LAN interface names in array format, unstated interfaces may have undefined behaviors
-LANINTS=('')
+LANINTS=('' '' '')
 #       State WAN interface name each LAN will use as gateway in array format, if gateway not required use blank entry ('')
-LANOUTS=('')
+LANOUTS=('' '' '')
+#ALLOW SOME INTERFACES FULL ACCESS?
+#ALLOW SOME INTERFACES ACCESS TO ALL LANS?
+#ALLOW STATIC ROUTES?
 
-#       State WAN ports to forward in array format
-PRTFWDS=('')
+#       State default WAN interface ports to forward in array format
+PRTFWDS=('' '' '' '' '')
+#       Forward default WAN ports on all WAN interfaces
+PRTSWAN=false
+#       Forward default WAN ports on all LAN interfaces
+PRTSLAN=false
 #       State LAN interface name each port forward should go to in array format
-PRTLANS=('')
+PRTLANS=('' '' '' '' '')
 #       State LAN IP each port should forward to in array format
-PRTSIPS=('')
+PRTSIPS=('' '' '' '' '')
 #       State LAN destination ports in array format, blank ('') entries won't be translated
-PRTPRTS=('')
-######        NO FURTHER MODIFICATION NEEDED        ######
+PRTPRTS=('' '' '' '' '')
 
 ######        NEEDED FUNCTIONS        ######
 err() {
@@ -118,8 +113,8 @@ networkmin() {
 inntwrk() {
 	[ -z "$1" ] || ! isip "$1" && return 1
 	[ -z "$2" ] || ! iscidr "$2" && return 1
-	[ "$(networkmin $1/${2#*/})" != "$(networkmin $2)" ] && return 1
-	return 0
+	[ "$(networkmin $1/${2#*/})" = "$(networkmin $2)" ] && return 0
+	return 1
 }
 isport() {
 	if [ -z "$1" ] || [[ ! $1 =~ ^[0-9]+$ ]] || [ $1 -lt 0 ] || [ $1 -gt 65535 ]; then
@@ -128,8 +123,13 @@ isport() {
 	fi
 	return 0
 }
+BINARIES=('iptables' 'ip')
+for x in "${!BINARIES[@]}"; do
+	BINARIES[$x]="$(command -v ${BINARIES[$x]})" || errout "Required binaries (applications) not available!"
+done
 
-######        HANDLE SUGGESTED NETWORKS, CLEAR RULES/POLICIES, ADD NEW POLICIES, VERIFY FORWARDING ENABLED, ADD NEW RULES        ######
+######        VERIFY INTERFACES, NETWORKS, PORT FORWARDS, AND IPv4 FORWARDING        ######
+
 #       Verify all interfaces and get addresses/networks
 [ -z "${WANINTS[*]}" ] && errout 'No WANs specified, nothing to do! Exiting!'
 for x in "${!WANINTS[@]}"; do
@@ -158,7 +158,7 @@ for x in "${!LANINTS[@]}"; do
 	if [ -n "${LANOUTS[$x]}" ]; then
 		y=true
 		for z in "${!WANINTS[@]}"; do
-			[ "${LANOUTS[$x]}" = "${!WANINTS[$z]}" ] && y=false && break
+			[ "${LANOUTS[$x]}" = "${WANINTS[$z]}" ] && y=false && break
 		done
 		$y && LANOUTS[$x]='' && $WARNING && err "LAN interface ${LANINTS[$x]} (array # $x) has invalid WAN/gateway interface, removing gateway from this LAN!"
 	fi
@@ -178,10 +178,11 @@ for x in "${!LANINTS[@]}"; do
 	LANIPS[$x]=${LANCIDRS[$x]%/*}
 	LANCIDRS[$x]="$(networkmin ${LANCIDRS[$x]})/${LANCIDRS[$x]#*/}"
 done
+
 #       Verify all open ports and port forwards
 for x in "${!PRTFWDS[@]}"; do
 	if ! isport "${PRTFWDS[$x]}"; then
-		$WARNING && err "Port forward (array # $x) will not be used!"
+		$WARNING && err "Port forward (${PRTFWDS[$x]}) will not be used!"
 		unset PRTFWDS[$x] PRTLANS[$x] PRTSIPS[$x] PRTPRTS[$x]
 		continue 1
 	fi
@@ -189,7 +190,7 @@ for x in "${!PRTFWDS[@]}"; do
 		y=false
 		for z in "${!WANPRTS[@]}"; do
 			if [ "${PRTFWDS[$x]}" = "${WANPRTS[$z]}" ]; then
-				$WARNING && err "Port ${PRTFWDS[$x]} forward (array # $x) conflicts with WAN port, will not forward this port!"
+				$WARNING && err "Port forward (${PRTFWDS[$x]}) conflicts with open WAN port, will not forward this port!"
 				y=true
 				unset PRTFWDS[$x] PRTLANS[$x] PRTSIPS[$x] PRTPRTS[$x]
 				break 1
@@ -200,21 +201,27 @@ for x in "${!PRTFWDS[@]}"; do
 	y=true
 	for z in "${!LANINTS[@]}"; do
 		if [ "${LANINTS[$z]}" = "${PRTLANS[$x]}" ]; then
+			$WARNING && ! inntwrk "${PRTSIPS[$x]}" "${LANCIDRS[$z]}" && err "Port forward (${PRTFWDS[$x]}) destination LAN IP (${PRTSIPS[$x]}) is not in LAN interface (${LANINTS[$z]}) network (${LANCIDRS[$z]})!"
 			y=false
-			inntwrk "${PRTSIPS[$x]}" "${LANCIDRS[$z]}" || $WARNING && err "Port ${PRTFWDS[$x]} forward (array # $x) destination LAN IP is not in LAN interface network!"
 			break 1
 		fi
 	done
-	if $y; then
+	if [ "$y" = true ]; then
 		$WARNING && err "Port ${PRTFWDS[$x]} forward (array # $x) LAN interface does not exist, will not forward this port!"
 		unset PRTFWDS[$x] PRTLANS[$x] PRTSIPS[$x] PRTPRTS[$x]
 		continue 1
 	fi
-	if ! isport "$PRTPRTS"; then
+	if ! isport "${PRTFWDS[$x]}"; then
 		$WARNING && err "Port ${PRTFWDS[$x]} forward (array # $x) destination port invalid, will not forward this port!"
 		unset PRTFWDS[$x] PRTLANS[$x] PRTSIPS[$x] PRTPRTS[$x]
 	fi
 done
+
+#       IPv4 FORWARDING
+echo "1" > /proc/sys/net/ipv4/ip_forward
+sysctl net.ipv4.ip_forward=1
+
+######        CLEAR POLICIES AND RULES AND ADD NEW POLICIES AND RULES        ######
 
 #       POLICY + FLUSH
 iptables -F INPUT
@@ -226,9 +233,7 @@ iptables -F -t mangle
 iptables -P INPUT DROP
 iptables -P FORWARD DROP
 iptables -P OUTPUT DROP
-#       Verify IPv4 Forwarding
-echo "1" > /proc/sys/net/ipv4/ip_forward
-sysctl net.ipv4.ip_forward=1
+
 #       INPUT RULES
 echo "allow in from broadcast"
 iptables -A INPUT -d 255.255.255.255 -j ACCEPT
@@ -241,60 +246,94 @@ for x in "${!LANINTS[@]}"; do
 done
 echo "allow in from LAN* on same LAN*"
 for x in "${!LANINTS[@]}"; do
-	iptables -A INPUT -i ${LANINTS[$x]} -s ${LANCIDRS[$x]} -j ACCEPT
+	iptables -A INPUT -i "${LANINTS[$x]}" -s "${LANCIDRS[$x]}" -j ACCEPT
 done
-echo " drop in from localhost and LAN* on WAN (spoofers)"
-iptables -A INPUT -i $WANINT -s 127.0.0.0/8 -j DROP
-for x in "${!LANINTS[@]}"; do
-      iptables -A INPUT -i $WANINT -s ${LANCIDRS[$x]} -j DROP
+echo " drop in from localhost and LAN* on WANs (spoofers)"
+for x in "${!WANINTS[@]}"; do
+	iptables -A INPUT -i "${WANINTS[$x]}" -s 127.0.0.0/8 -j DROP
+	for y in "${!LANINTS[@]}"; do
+	      iptables -A INPUT -i "${WANINTS[$x]}" -s "${LANCIDRS[$y]}" -j DROP
+	done
 done
-echo "allow in from WAN on WAN; rule should be modified to allow only specific services"
-iptables -A INPUT -i $WANINT -d $WANIP -j ACCEPT
-echo "allow in from localhost on localhost"
+echo "allow in to WAN on WAN"
+if [ "$WANPRTS" = 'all' ]; then
+	for x in "${!WANINTS[@]}"; do
+		iptables -A INPUT -i "${WANINTS[$x]}" -d "${WANIPS[$x]}" -j ACCEPT
+		$WANSPRT || break 1
+	done
+else
+	for x in "${!WANINTS[@]}"; do
+		for y in "${!WANPRTS[@]}"; do
+			iptables -A INPUT -i "${WANINTS[$x]}" -d "${WANIPS[$x]}" -p tcp --dport "${WANPRTS[$y]}" -j ACCEPT
+			iptables -A INPUT -i "${WANINTS[$x]}" -d "${WANIPS[$x]}" -p udp --dport "${WANPRTS[$y]}" -j ACCEPT
+		done
+		$WANSPRT || break 1
+	done
+fi
+echo "allow in on localhost"
 iptables -A INPUT -i lo -j ACCEPT
+
 #       OUTPUT RULES
 echo "allow out to broadcast"
 iptables -A OUTPUT -d 255.255.255.255 -j ACCEPT
-echo "allow out to LAN* from same LAN*"
+echo "allow out from LAN* from same LAN*"
 for x in "${!LANINTS[@]}"; do
-	iptables -A OUTPUT -o ${LANINTS[$x]} -s ${LANCIDRS[$x]} -d ${LANCIDRS[$x]} -j ACCEPT
+	iptables -A OUTPUT -o "${LANINTS[$x]}" -s "${LANCIDRS[$x]}" -d "${LANCIDRS[$x]}" -j ACCEPT
 done
-echo "allow out to LAN* from WAN"
-for x in "${!LANINTS[@]}"; do
-	iptables -A OUTPUT -o ${LANINTS[$x]} -s $WANIP -j ACCEPT
+echo "allow out from LAN* from WAN"
+for x in "${!WANINTS[@]}"; do
+	for y in "${!LANINTS[@]}"; do
+	       [ "${WANINTS[$x]}" = "${LANOUTS[$y]}" ] && iptables -A OUTPUT -o "${LANINTS[$y]}" -s "${WANIPS[$x]}" -j ACCEPT
+	done
 done
-echo " drop out to WAN from LAN*"
-for x in "${!LANINTS[@]}"; do
-	iptables -A OUTPUT -o $WANINT -s ${LANCIDRS[$x]} -j DROP
+echo " drop out from WAN from LAN*"
+for x in "${!WANINTS[@]}"; do
+	for y in "${!LANINTS[@]}"; do
+		iptables -A OUTPUT -o "${WANINTS[$x]}" -s "${LANCIDRS[$y]}" -j DROP
+	done
 done
-echo "allow out to WAN from WAN"
-iptables -A OUTPUT -o $WANINT -s $WANIP -j ACCEPT
-echo "allow out to local"
+echo "allow out from WAN from WAN"
+for x in "${!WANINTS[@]}"; do
+	iptables -A OUTPUT -o "${WANINTS[$x]}" -s "${WANIPS[$x]}" -j ACCEPT
+done
+echo "allow out from local"
 iptables -A OUTPUT -o lo -s 127.0.0.0/8 -j ACCEPT
+
 #       FORWARD RULES
 echo "allow forward to WAN on LAN*"
 for x in "${!LANINTS[@]}"; do
 	[ -z "${LANOUTS[$x]}" ] && continue 1
-	[ "${LANOUTS[$x]}" = 'VPNINT' ] && ! $VPNUP && continue 1
-	iptables -A FORWARD -i ${LANINTS[$x]} -o ${!LANOUTS[$x]} -j ACCEPT
+	iptables -A FORWARD -i "${LANINTS[$x]}" -o "${LANOUTS[$x]}" -j ACCEPT
 done
+#ALLOW SOME INTERFACES FULL ACCESS?
+#ALLOW SOME INTERFACES ACCESS TO ALL LANS?
 echo "allow forward for established/related to LAN* on WAN"
 for x in "${!LANINTS[@]}"; do
 	[ -z "${LANOUTS[$x]}" ] && continue 1
-	[ "${LANOUTS[$x]}" = 'VPNINT' ] && ! $VPNUP && continue 1
-	iptables -A FORWARD -i ${!LANOUTS[$x]} -o ${LANINTS[$x]} -m state --state ESTABLISHED,RELATED -j ACCEPT
+	iptables -A FORWARD -i "${LANOUTS[$x]}" -o "${LANINTS[$x]}" -m state --state ESTABLISHED,RELATED -j ACCEPT
 done
+
 #       POSTROUTING RULES
 echo "allow masquerade NAT on WAN"
 for x in "${!WANINTS[@]}"; do
 	iptables -t nat -A POSTROUTING -o "${WANINTS[$x]}" -j MASQUERADE
 done
-#       PORT FORWARDS (manual port forwards for tcp and udp)
-for x in "${!PRTFWDS[@]}"; do
-        iptables -t nat -I PREROUTING -p tcp -d "${!PRTLANS[$x]}" --dport "${PRTFWDS[$x]}" -j DNAT --to "${PRTSIPS[$x]}"
-        iptables -t nat -I PREROUTING -p udp -d "${!PRTLANS[$x]}" --dport "${PRTFWDS[$x]}" -j DNAT --to "${PRTSIPS[$x]}"
-        iptables -I FORWARD -o "${PRTLANS[$x]}" -p tcp --dport "${PRTFWDS[$x]}" -j ACCEPT
-        iptables -I FORWARD -o "${PRTLANS[$x]}" -p udp --dport "${PRTFWDS[$x]}" -j ACCEPT
-done
 
+#       PREROUTING/FORWARD RULES FOR PORT FORWARDS
+echo "change destination IP for designated ports, and allow forwarding to LAN* for designated ports"
+for x in "${!PRTFWDS[@]}"; do
+	iptables -I FORWARD -o "${PRTLANS[$x]}" -p tcp --dport "${PRTFWDS[$x]}" -j ACCEPT
+	iptables -I FORWARD -o "${PRTLANS[$x]}" -p udp --dport "${PRTFWDS[$x]}" -j ACCEPT
+	for y in "${!WANINTS[@]}"; do
+		iptables -t nat -I PREROUTING -i "${WANINTS[$y]}" -p tcp --dport "${PRTFWDS[$x]}" -j DNAT --to "${PRTSIPS[$x]}"
+		iptables -t nat -I PREROUTING -i "${WANINTS[$y]}" -p udp --dport "${PRTFWDS[$x]}" -j DNAT --to "${PRTSIPS[$x]}"
+		$PRTSWAN || break 1
+	done
+	if [ "$PRTSLAN" = true ]; then
+		for y in "${!LANINTS[@]}"; do
+			iptables -t nat -I PREROUTING -i "${LANINTS[$y]}" -p tcp --dport "${PRTFWDS[$x]}" -j DNAT --to "${PRTSIPS[$x]}"
+			iptables -t nat -I PREROUTING -i "${LANINTS[$y]}" -p udp --dport "${PRTFWDS[$x]}" -j DNAT --to "${PRTSIPS[$x]}"
+		done
+	fi
+done
 exit 0
