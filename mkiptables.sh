@@ -18,9 +18,6 @@ WANSPRT=false
 LANINTS=('' '' '')
 #       State WAN interface name each LAN will use as gateway in array format, if gateway not required use blank entry ('')
 LANOUTS=('' '' '')
-#ALLOW SOME INTERFACES FULL ACCESS?
-#ALLOW SOME INTERFACES ACCESS TO ALL LANS?
-#ALLOW STATIC ROUTES?
 
 #       State default WAN interface ports to forward in array format
 PRTFWDS=('' '' '' '' '')
@@ -305,8 +302,6 @@ for x in "${!LANINTS[@]}"; do
 	[ -z "${LANOUTS[$x]}" ] && continue 1
 	iptables -A FORWARD -i "${LANINTS[$x]}" -o "${LANOUTS[$x]}" -j ACCEPT
 done
-#ALLOW SOME INTERFACES FULL ACCESS?
-#ALLOW SOME INTERFACES ACCESS TO ALL LANS?
 echo "allow forward for established/related to LAN* on WAN"
 for x in "${!LANINTS[@]}"; do
 	[ -z "${LANOUTS[$x]}" ] && continue 1
