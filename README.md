@@ -9,14 +9,14 @@ OnlyOffice is extremely difficult to get running without a Docker solution, I pr
 Before spinning up a new container/VM/host figure out the passwords you'll need. This should absolutely be handled securely. I'll modify this script if there are any concerns on that front, but so far this is handled well in my opinion. Next, decide on a usable static IP, and unless you use your connector application exclusively locally or over VPN connect a DNS name, set up routing, and/or connect any reverse proxy you'll be using.. E.G. Accessing this server should be handled the same way you access your connector application, such as the OnlyOffice App on NextCloud. So, something like cloud.t.l.d and office.t.l.d could be used.
 
 You'll be asked for/will need:
-routing/VPN/DNS/reverse proxy set up
-a static IP
-root system user pass
-two letter country code and host/domain name to generate a 10 year self signed cert
-rabbitmq system user pass
-rabbitmq onlyoffice user pass
-postgres system user pass
-postgresql onlyoffice user pass
+1. routing/VPN/DNS/reverse proxy set up
+2. a static IP
+3. root system user pass
+3. two letter country code and host/domain name to generate a 10 year self signed cert
+4. rabbitmq system user pass
+5. rabbitmq onlyoffice user pass
+8. postgres system user pass
+7. postgresql onlyoffice user pass
 
 While there are some error checks and the script should very quickly and easily perform all tasks mostly unattended it is mainly meant as a guide for install. As such troubleshooting will be up to you when something breaks. Contibuters welcome.
 
