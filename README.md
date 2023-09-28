@@ -4,7 +4,7 @@ A colletction of Bash scripts.
 Mostly very simple dynamic domain name based with a few useful other tools.
 
 # installonlyoffice.sh
-Installing OnlyOffice is extremely difficult to get running without a Docker solution, I prefer to know how my systems are configured with simpler tools such as Aptitude, and prefer to save the (very minor) overhead from running another virtualized environment. There was very little real help publically available that I could find, so I opted to write a script to do it. Soon I will write something similar for paperless-ngx. This is not a commitment to help fix the world's technical issues.
+OnlyOffice is extremely difficult to get running without a Docker solution, I prefer to know how my systems are configured with simpler tools such as Aptitude, and prefer to save the (very minor) overhead from running another virtualized environment. There was very little real help publically available that I could find, so I opted to write a script to do it. Soon I will write something similar for paperless-ngx. This is not a commitment to help fix the world's technical issues.
 
 Before spinning up a new container/VM/host figure out the passwords you'll need. This should absolutely be handled securely. I'll modify this script if there are any concerns on that front, but so far this is handled well in my opinion. Next, decide on a usable static IP, and unless you use your connector application exclusively locally or over VPN connect a DNS name, set up routing, and/or connect any reverse proxy you'll be using.. E.G. Accessing this server should be handled the same way you access your connector application, such as the OnlyOffice App on NextCloud. So, something like cloud.t.l.d and office.t.l.d could be used.
 
