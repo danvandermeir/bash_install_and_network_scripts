@@ -35,7 +35,7 @@ fi
 while sleep 0.3; do
         if [ -z "$STARTED" ]; then
                 while ! grep -q up "/sys/class/net/$SERVERINTERFACENAME/operstate" &>/dev/null; do sleep 1; done
-                while [ -z "$INTIP" ] || [[ $INTIF == 169.* ]]; do INTIP="$(ip a show dev ${SERVERINTERFACENAME}|grep -m 1 -w inet|cut -d'/' -f1|rev|cut -d' ' -f1|rev)"; sleep 1; done
+                while [ -z "$INTIP" ] || [[ $INTIP == 169.* ]]; do INTIP="$(ip a show dev ${SERVERINTERFACENAME}|grep -m 1 -w inet|cut -d'/' -f1|rev|cut -d' ' -f1|rev)"; sleep 1; done
                 /root/ustreamer/ustreamer -r 1920x1080 -c CPU -s "$INTIP" --jpeg-sink "${HOSTNAME}.jpeg" --h264-sink-mode 755 --jpeg-sink-rm --exit-on-parent-death &
                 STARTED=$!
         elif [ -n "$BACKER" ]; then
