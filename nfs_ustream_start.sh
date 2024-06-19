@@ -20,7 +20,7 @@ fi
 SCRIPTPATH="$(realpath $0)"
 if [ -f "/etc/rc.local" ]; then
         if ! grep -q "$SCRIPTPATH" /etc/rc.local $>/dev/null; then
-                RCF=(</etc/rc.local)
+                RCF=($(</etc/rc.local))
                 for LINE in "${!RCF[@]}"; do
                         [ "${RCF[$LINE]}" = 'exit 0' ] && RCF[$LINE]="su -c \"screen -dm -S ustnfs ${SCRIPTPATH}\""
                 done
