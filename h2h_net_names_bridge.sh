@@ -21,7 +21,7 @@ for x in $(grep -irl 'Ethernet Gadget' /sys/bus/usb/devices/*/product); do
                 if [ -d "${y}/net" ]; then
                         z="$(ls ${y}/net|rev|cut -d'/' -f1|rev)"
                         if [[ $z == usb* ]]; then
-                                brctl show|grep -q "${z}" &>/dev/null && break 1
+                                brctl show|grep -q "${z}" &>/dev/null && w=$((w+1)) && break 1
                         else
                                 logger "setting interface usb$w down"
                                 ip link set dev "${z}" down
