@@ -5,6 +5,18 @@ PASS=""
 LMOUNTPNT=""
 RMOUNTPNT=""
 SERVERINTERFACENAME=""
+GADGET=true
+if ! [ -d /root/ustreamer ]; then
+        apt update; apt -y upgrade; apt -y dist-upgrade; apt -y install make gcc libjpeg9 libjpeg-dev libevent-dev libjpeg62-turbo libbsd-dev wget tmux screen git sed
+        cd /root
+        git clone --depth=1 https://github.com/pikvm/ustreamer
+        cd ustreamer
+        make
+fi
+if $GADGET; then
+        echo 'dtoverlay=dwc2'>>/boot/config.txt
+        sed -i 's/rootwait/rootwait modules-load=dwc2,g_ether/' /boot/cmdline.txt
+fi
 SCRIPTPATH="$(realpath $0)"
 if [ -f "/etc/rc.local" ]; then
         if ! grep -q "$SCRIPTPATH" /etc/rc.local $>/dev/null; then
