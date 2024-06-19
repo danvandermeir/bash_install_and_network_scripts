@@ -19,10 +19,11 @@ if $GADGET; then
 fi
 SCRIPTPATH="$(realpath $0)"
 if [ -f "/etc/rc.local" ]; then
-        if ! grep -q "$SCRIPTPATH" /etc/rc.local $>/dev/null; then
-                RCF=($(</etc/rc.local))
-                for LINE in "${!RCF[@]}"; do
-                        [ "${RCF[$LINE]}" = 'exit 0' ] && RCF[$LINE]="su -c \"screen -dm -S ustnfs ${SCRIPTPATH}\""
+        if ! grep -q "${SCRIPTPATH}" '/etc/rc.local' &>/dev/null; then
+                IFS=$'\n'
+                RCF=($(<'/etc/rc.local'))
+                for x in "${!RCF[@]}"; do
+                        [[ "${RCF[$x]}" == 'exit 0' ]] && RCF[$x]="su -c \"screen -dm -S ustnfs ${SCRIPTPATH}\""
                 done
                 RCF+=('exit 0')
                 printf "%s\n" "${RCF[@]}" > /etc/rc.local
