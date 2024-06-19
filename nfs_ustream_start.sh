@@ -1,10 +1,24 @@
 #!/bin/bash
-NFSSERV="172.17.2.1"
-USER="thehammer"
-PASS="videorecord"
-LMOUNTPNT="/mnt/OPA_NFS"
-RMOUNTPNT="/media/OPA_NFS"
-SERVERINTERFACENAME="usb0"
+NFSSERV=""
+USER=""
+PASS=""
+LMOUNTPNT=""
+RMOUNTPNT=""
+SERVERINTERFACENAME=""
+SCRIPTPATH="$(realpath $0)"
+if [ -f "/etc/rc.local" ]; then
+        if ! grep -q "$SCRIPTPATH" /etc/rc.local $>/dev/null; then
+                RCF=(</etc/rc.local)
+                for LINE in "${!RCF[@]}"; do
+                        [ "${RCF[$LINE]}" = 'exit 0' ] && RCF[$LINE]="su -c \"screen -dm -S ustnfs ${SCRIPTPATH}\""
+                done
+                RCF+=('exit 0')
+                printf "%s\n" "${RCF[@]}" > /etc/rc.local
+                unset RCF
+        fi
+else
+        logger "NO /etc/rc.local file! CANNOT AUTOMATE!"
+fi
 while sleep 0.3; do
         if [ -z "$STARTED" ]; then
                 while ! grep -q up "/sys/class/net/$SERVERINTERFACENAME/operstate" &>/dev/null; do sleep 1; done
