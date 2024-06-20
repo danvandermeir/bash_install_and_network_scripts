@@ -1,12 +1,9 @@
 #!/bin/bash
 BRIDGENAME="vmbr1"
 w=0
-while ip a show dev "usb${w}" &>/dev/null; do
-        w=$((w+1))
-done
 SCRIPTPATH="$(realpath $0)"
 if [ -f "/etc/udev/rules.d/90-networking.rules" ]; then
-        if $(grep -qi "$SCRIPTPATH" /etc/udev/rules.d/90-networking.rules &>/dev/null); then
+        if ! grep -qi "$SCRIPTPATH" /etc/udev/rules.d/90-networking.rules &>/dev/null; then
                 echo "SUBSYSTEM==\"net\",           RUN+=\"$SCRIPTPATH\"">>/etc/udev/rules.d/90-networking.rules
         fi
 elif [ -d "/etc/udev" ]; then
