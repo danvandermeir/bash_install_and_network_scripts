@@ -1,5 +1,5 @@
 #!/bin/bash
-BRIDGENAME="vmbr1"
+BRIDGENAME=""
 w=0
 SCRIPTPATH="$(realpath $0)"
 if [ -f "/etc/udev/rules.d/90-networking.rules" ]; then
