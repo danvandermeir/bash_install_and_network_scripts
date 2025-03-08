@@ -3,11 +3,6 @@ A colletction of Bash scripts.
 
 Mostly very simple dynamic domain name based with a few useful other tools.
 
-# netmap.sh
-I drop this into /usr/local/bin with 755 permissions and add a line to any Wireguard .conf files I have so that any network overlaps I have are taken care of. Just make sure to check /etc/wireguard for any new network translations after any up/downs.
-
-`PostUp = /usr/local/bin/netmap.sh %i`
-
 # installonlyoffice.sh
 why?
 
